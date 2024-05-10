@@ -54,8 +54,11 @@ def get_records(frmannee, frmclub, frmepreuve):
                     "city": data[6]
                 })
 
-    # Returning the records or "No data" message
-    return jsonify(records) if records else jsonify({"message": "No data"})
+        # Returning the records or "No data" message with appropriate HTTP status code
+        return (jsonify(records), 200) if records else (jsonify({"message": "No data"}), 404)
+    else:
+        # Returning an error message with HTTP status code 500
+        return jsonify({"error": "Table not found"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
