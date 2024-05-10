@@ -30,16 +30,20 @@ def get_records(frmannee, frmclub, frmepreuve):
     # List to store the data
     records = []
 
-    # Checking if the table exists
+    # Check if the table exists
     if table:
         # Retrieving the rows of the table
         rows = table.find_all('tr')
 
+        # Check if the second TR contains the club name
+        club_row = rows[1] if len(rows) > 1 else None
+        club_name = club_row.find('div', {'class': 'headers'}).text if club_row else None
+
         # Iterating through the rows to extract the data
-        for row in rows:
+        for row in rows[2:]:  # Skip the first two rows (headers and club name)
             # Extracting data from each column in the row
             cells = row.find_all(['td', 'th'])  # Including th tags in case they contain data
-            data = [cell.text.strip() for cell in cells if cell.has_attr('class') and ('datas1' in cell['class'] or 'datas2' in cell['class'])]
+            data = [cell.text.strip() for cell in cells if cell.has_attr('class') and ('datas1' in cell['class'] or 'datas0' in cell['class'])]
 
             # Checking if the first field is empty
             if data and data[0] != "":
@@ -54,11 +58,12 @@ def get_records(frmannee, frmclub, frmepreuve):
                     "city": data[6]
                 })
 
-        # Returning the records or "No data" message with appropriate HTTP status code
-        return (jsonify(records), 200) if records else (jsonify({"message": "No data"}), 404)
-    else:
-        # Returning an error message with HTTP status code 500
-        return jsonify({"error": "Table not found"}), 500
+    # Returning the number of results, club name, and records
+    return jsonify({
+        "club_name": club_name,
+        "num_results": len(records),
+        "records": records
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)
