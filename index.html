@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Résultats de la course</title>
+    <style>
+        /* Styles CSS */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f7f7f7;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .filters {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .search-bar {
+            position: relative;
+        }
+        .search-bar input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .clear-search {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #999;
+        }
+        .clear-search:hover {
+            color: #666;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: yellow;
+        }
+        .result-info {
+            margin-top: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <h1>{{ clubName }}</h1>
+            <div class="filters">
+                <div>
+                    <label for="year">Année :</label>
+                    <select id="year" v-model="selectedYear" @change="onYearChange">
+                        <option v-for="year in years" :key="year" :value="year">{{ year }}</option>
+                    </select>
+                </div>
+                <div class="search-bar">
+                    <input type="text" v-model="searchQuery" placeholder="Recherche...">
+                    <span class="clear-search" @click="clearSearch">&#10006;</span>
+                </div>
+                <div class="order-by">
+                    <label for="order">Trier par :</label>
+                    <select id="order" v-model="orderBy" @change="sortRecords">
+                        <option value="name">Nom</option>
+                        <option value="city">Ville</option>
+                        <option value="date">Date</option>
+                        <option value="time">Temps</option>
+                    </select>
+                </div>
+            </div>
+            <p class="result-info">Nombre total de résultats : {{ totalResults }}</p>
+            <div v-if="records !== null">
+                <div v-for="(table, index) in filteredTables" :key="index">
+                    <h2>{{ distances[index] }}</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Ville</th>
+                                <th>Date</th>
+                                <th>Temps</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="table.length === 0">
+                                <td colspan="4">Aucun résultat pour cette distance.</td>
+                            </tr>
+                            <tr v-for="record in table" :key="record.name">
+                                <td v-html="highlight(record.name)"></td>
+                                <td v-html="highlight(record.city)"></td>
+                                <td v-html="highlight(record.date)"></td>
+                                <td v-html="highlight(record.time)"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div v-else>
+                <p>Chargement...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                selectedYear: new Date().getFullYear(),
+                searchQuery: '',
+                orderBy: 'name',
+                clubName: '',
+                totalResults: 0,
+                records: null,
+                distances: ['5 km', '10 km', 'Semi-marathon', 'Marathon']
+            },
+            computed: {
+                years() {
+                    const currentYear = new Date().getFullYear();
+                    return Array.from({ length: 5 }, (_, i) => currentYear - i);
+                },
+                filteredTables() {
+                    if (!this.records) return [];
+                    return this.records.map(records => this.filterRecords(records));
+                }
+            },
+            methods: {
+                async fetchRecords() {
+                    try {
+                        this.records = null; // Reset records while fetching
+                        const responses = await Promise.all([
+                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}/089024/5`),
+                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}/089024/10`),
+                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}/089024/21`),
+                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}/089024/42`)
+                        ]);
+                        this.clubName = responses.find(response => response.num_results > 0)?.club_name || '';
+                        this.totalResults = responses.reduce((total, response) => total + response.num_results, 0);
+                        this.records = responses.map(response => response.records);
+                        this.sortRecords(); // Tri initial
+                    } catch (error) {
+                        console.error('Erreur lors de la récupération des données:', error);
+                    }
+                },
+                async fetchData(url) {
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            throw new Error('Erreur lors de la récupération des données');
+                        }
+                        return response.json();
+                    } catch (error) {
+                        console.error('Erreur lors de la récupération des données:', error);
+                        return { num_results: 0, records: [] }; // Return empty data if error occurs
+                    }
+                },
+                filterRecords(records) {
+                    return records.filter(record =>
+                        Object.values(record).some(value =>
+                            value.toString().toLowerCase().includes(this.searchQuery.toLowerCase())
+                        )
+                    );
+                },
+                clearSearch() {
+                    this.searchQuery = ''; // Vide le champ de recherche
+                },
+                highlight(text) {
+                    // Met en surbrillance le texte de recherche dans les résultats
+                    return this.searchQuery ? text.toString().replace(new RegExp(this.searchQuery, 'gi'), match => `<span class="highlight">${match}</span>`) : text;
+                },
+                sortRecords() {
+                    // Trie les enregistrements selon l'option sélectionnée
+                    this.records.forEach(records => records.sort((a, b) => {
+                        const aValue = a[this.orderBy];
+                        const bValue = b[this.orderBy];
+                        if (this.orderBy === 'time') {
+                            return this.compareTime(aValue, bValue);
+                        }
+                        return aValue.localeCompare(bValue);
+                    }));
+                },
+                compareTime(a, b) {
+                    // Compare les temps au format hh:mm:ss
+                    const aTimeSeconds = this.timeToSeconds(a);
+                    const bTimeSeconds = this.timeToSeconds(b);
+                    // Compare les temps convertis
+                    return aTimeSeconds - bTimeSeconds;
+                },
+                timeToSeconds(time) {
+                    // Parse le temps au format hh:mm:ss et le convertit en secondes
+                    const parts = time.split(/h|'|"/).map(part => parseInt(part));
+                    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                },
+                onYearChange() {
+                    this.searchQuery = ''; // Clear search query when changing year
+                    this.fetchRecords();
+                }
+            },
+            mounted() {
+                this.fetchRecords();
+            }
+        });
+    </script>
+</body>
+</html>
