@@ -80,8 +80,16 @@
             <h1>{{ clubName }}</h1>
             <div class="filters">
                 <div>
+                    <label for="clubNumber">Numéro du Club :</label>
+                    <input type="text" id="clubNumber" v-model="clubNumber" @change="fetchRecords">
+                </div>
+                <div>
+                    <label for="backgroundColor">Couleur de fond :</label>
+                    <input type="color" id="backgroundColor" v-model="backgroundColor" @input="updateBackgroundColor">
+                </div>
+                <div>
                     <label for="year">Année :</label>
-                    <select id="year" v-model="selectedYear" @change="onYearChange">
+                    <select id="year" v-model="selectedYear" @change="fetchRecords">
                         <option v-for="year in years" :key="year" :value="year">{{ year }}</option>
                     </select>
                 </div>
@@ -110,17 +118,19 @@
                                 <th>Ville</th>
                                 <th>Date</th>
                                 <th>Temps</th>
+                                <th>RP</th> <!-- Nouvelle colonne pour le record personnel -->
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-if="table.length === 0">
-                                <td colspan="4">Aucun résultat pour cette distance.</td>
+                                <td colspan="5">Aucun résultat pour cette distance.</td>
                             </tr>
                             <tr v-for="record in table" :key="record.name">
                                 <td v-html="highlight(record.name)"></td>
                                 <td v-html="highlight(record.city)"></td>
                                 <td v-html="highlight(record.date)"></td>
                                 <td v-html="highlight(record.time)"></td>
+                                <td>{{ record.rp ? 'Oui' : 'Non' }}</td> <!-- Affiche Oui/Non pour RP -->
                             </tr>
                         </tbody>
                     </table>
@@ -140,6 +150,8 @@
                 selectedYear: new Date().getFullYear(),
                 searchQuery: '',
                 orderBy: 'name',
+                clubNumber: '',
+                backgroundColor: '#f7f7f7',
                 clubName: '',
                 totalResults: 0,
                 records: null,
@@ -158,12 +170,12 @@
             methods: {
                 async fetchRecords() {
                     try {
-                        this.records = null; // Reset records while fetching
+                        const clubNumberParam = this.clubNumber ? `/${this.clubNumber}` : '';
                         const responses = await Promise.all([
-                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}/089024/5`),
-                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}/089024/10`),
-                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}/089024/21`),
-                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}/089024/42`)
+                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}${clubNumberParam}/5`),
+                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}${clubNumberParam}/10`),
+                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}${clubNumberParam}/21`),
+                            this.fetchData(`http://127.0.0.1:5000/records/${this.selectedYear}${clubNumberParam}/42`)
                         ]);
                         this.clubName = responses.find(response => response.num_results > 0)?.club_name || '';
                         this.totalResults = responses.reduce((total, response) => total + response.num_results, 0);
@@ -211,20 +223,18 @@
                     }));
                 },
                 compareTime(a, b) {
-                    // Compare les temps au format hh:mm:ss
-                    const aTimeSeconds = this.timeToSeconds(a);
-                    const bTimeSeconds = this.timeToSeconds(b);
-                    // Compare les temps convertis
-                    return aTimeSeconds - bTimeSeconds;
+                    const aParts = a.split(/[hms]/).map(part => parseInt(part) || 0);
+                    const bParts = b.split(/[hms]/).map(part => parseInt(part) || 0);
+
+                    for (let i = 0; i < aParts.length; i++) {
+                        if (aParts[i] !== bParts[i]) {
+                            return aParts[i] - bParts[i];
+                        }
+                    }
+                    return 0;
                 },
-                timeToSeconds(time) {
-                    // Parse le temps au format hh:mm:ss et le convertit en secondes
-                    const parts = time.split(/h|'|"/).map(part => parseInt(part));
-                    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-                },
-                onYearChange() {
-                    this.searchQuery = ''; // Clear search query when changing year
-                    this.fetchRecords();
+                updateBackgroundColor() {
+                    document.body.style.backgroundColor = this.backgroundColor;
                 }
             },
             mounted() {

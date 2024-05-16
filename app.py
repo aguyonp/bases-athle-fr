@@ -49,15 +49,20 @@ def get_records(frmannee, frmclub, frmepreuve):
 
             # Checking if the first field is empty
             if data and data[0] != "":
+                
+                # Check if the time is a personal record (RP) & replace time
+                time, rp = (data[3].replace("''", "s").replace("'", "m").replace(" (RP)",""), True if 'RP' in data[3] else False)
+                
                 # Adding the data to the records list
                 records.append({
                     "name": data[0],
                     "category": data[1],
                     "event": data[2],
-                    "time": data[3],
+                    "time": time,
                     "gender": data[4],
                     "date": data[5],
-                    "city": data[6]
+                    "city": data[6],
+                    "rp": rp
                 })
 
     # Returning the number of results, club name, and records
